@@ -1,0 +1,41 @@
+Hi,
+
+I reuploaded this script, because I was unable to find it again.
+It seems to not be on the website anymore. (or i couldnt find it)
+My coworker luckily had a copy of it.
+I adjusted it to work with Jira 8.**
+Hope it helps!
+
+import com.atlassian.jira.component.ComponentAccessor;
+import com.atlassian.jira.event.type.EventDispatchOption;
+import com.atlassian.jira.issue.MutableIssue;
+import com.atlassian.jira.web.bean.PagerFilter;
+import com.atlassian.jira.issue.search.SearchResults;
+
+def projectManager = ComponentAccessor.getProjectManager();
+def issueManager = ComponentAccessor.getIssueManager();
+def currentUser = ComponentAccessor.getJiraAuthenticationContext().getLoggedInUser();
+def searchService = ComponentAccessor.getComponentOfType(com.atlassian.jira.bc.issue.search.SearchService);
+def jqlQueryParser = ComponentAccessor.getComponentOfType(com.atlassian.jira.jql.parser.JqlQueryParser);
+
+def deprecatedInsightCustomFieldId = *****;
+def newInsightCustomFieldId = *****;
+
+/* Change the custom field id's accordingly to your environment and the custome fields you want to migrate */
+def deprecatedInsightCustomField = ComponentAccessor.getCustomFieldManager().getCustomFieldObject(deprecatedInsightCustomFieldId);
+def newInsightCustomField = ComponentAccessor.getCustomFieldManager().getCustomFieldObject(newInsightCustomFieldId);
+
+def query = jqlQueryParser.parseQuery("cf[" + deprecatedInsightCustomFieldId + "] is not EMPTY");
+def searchResults = searchService.search(currentUser, query, PagerFilter.getUnlimitedFilter());
+
+log.warn("Issues to be updated: " + searchResults.getTotal());
+searchResults.getResults().each { issue ->
+MutableIssue mi = (MutableIssue) issueManager.getIssueObject(issue.getId());
+def insightObjects = mi.getCustomFieldValue(deprecatedInsightCustomField);
+if (insightObjects != null && !insightObjects.isEmpty()) {
+mi.setCustomFieldValue(newInsightCustomField, insightObjects);
+ComponentAccessor.getIssueManager().updateIssue(currentUser, mi, EventDispatchOption.DO_NOT_DISPATCH, false);
+
+log.warn("Changed issue: " + mi + ", set new custom field with values: " + insightObjects);
+}
+}
